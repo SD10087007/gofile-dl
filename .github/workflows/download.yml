@@ -1,4 +1,4 @@
-name: Gofile Downloader Fix
+name: Gofile Direct Downloader
 
 on:
   workflow_dispatch:
@@ -7,12 +7,26 @@ jobs:
   download_file:
     runs-on: ubuntu-latest
     steps:
-      - name: Fetch and Download
+      - name: Fetch Direct File
         run: |
           mkdir output
           cd output
-          # This tells GitHub's server to pull the file directly using an unblocked connection
-          curl -L -O "https://gofile.io/d/a4eG302I"
+          
+          # This script extracts the real, raw download path from the Gofile page
+          LINK="https://gofile.io/d/a4eG302I"
+          CONTENT_ID=$(echo "$LINK" | awk -F'/' '{print $5}')
+          
+          # Fetch the direct download URL from Gofile's public API data endpoint
+          API_DATA=$(curl -s "https://gofile.io")
+          DIRECT_URL=$(echo "$API_DATA" | grep -o '"directLink":"[^"]*' | grep -o '[^"]*$')
+          
+          # Download the real file data using the direct path
+          if [ -n "$DIRECT_URL" ]; then
+            curl -L -O "$DIRECT_URL"
+          else
+            echo "Failed to extract the direct link. Standard curl fallback:"
+            curl -L -O "$LINK"
+          fi
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
