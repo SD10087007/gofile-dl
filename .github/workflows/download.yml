@@ -7,6 +7,9 @@ jobs:
   download_file:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
@@ -15,58 +18,8 @@ jobs:
       - name: Install Requirements
         run: pip install requests
 
-      - name: Fetch Direct File Data
-        run: |
-          mkdir output
-          cd output
-          
-          python -c '
-          import os, requests, re
-          
-          link = "https://gofile.io/d/a4eG302I"
-          content_id = link.split("/")[-1]
-          
-          # 1. Fetch Gofile basic main page config to get the active website token
-          main_page = requests.get("https://gofile.io/dist/js/global.js").text
-          token_match = re.search(r"x-website-token\s*=\s*[\"']([^\"']+)[\"']", main_page)
-          wt_token = token_match.group(1) if token_match else "4fd6sg89d7s6" # fallback known token
-          
-          # 2. Query the contents API endpoint with the proper security headers
-          api_url = f"https://api.gofile.io/contents/{content_id}"
-          headers = {
-              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-              "Accept": "*/*",
-              "Origin": "https://gofile.io",
-              "Referer": "https://gofile.io/",
-              "x-website-token": wt_token
-          }
-          
-          res = requests.get(api_url, headers=headers).json()
-          
-          if res.get("status") == "ok":
-              # Handle single file or take the first file inside a shared folder link
-              children = res["data"].get("children", {})
-              if children:
-                  first_child_id = list(children.keys())[0]
-                  file_data = children[first_child_id]
-              else:
-                  file_data = res["data"]
-                  
-              direct_link = file_data.get("link") or file_data.get("directLink")
-              file_name = file_data.get("name", "downloaded_file")
-              
-              if direct_link:
-                  print(f"Downloading {file_name} from: {direct_link}")
-                  r = requests.get(direct_link, headers=headers, stream=True)
-                  with open(file_name, "wb") as f:
-                      for chunk in r.iter_content(chunk_size=8192):
-                          f.write(chunk)
-                  print("Success!")
-              else:
-                  print("Could not find a valid direct link in payload.")
-          else:
-              print(f"API Error response: {res}")
-          '
+      - name: Execute Download Script
+        run: python download.py
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
