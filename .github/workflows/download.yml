@@ -7,9 +7,6 @@ jobs:
   download_file:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
@@ -18,8 +15,66 @@ jobs:
       - name: Install Requirements
         run: pip install requests
 
-      - name: Execute Download Script
-        run: python download.py
+      - name: Run Script Directly
+        run: |
+          mkdir output
+          python -c "
+          import os, requests, re
+          
+          wt_token = '4fd6sg89d7s6'
+          try:
+              main_page = requests.get('https://gofile.io').text
+              token_match = re.search(r'x-website-token\s*=\s*[\"\']([^\"\'\s]+)[\"\']', main_page)
+              if token_match: wt_token = token_match.group(1)
+          except:
+              pass
+
+          headers = {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+              'Accept': '*/*',
+              'Origin': 'https://gofile.io',
+              'Referer': 'https://gofile.io',
+              'x-website-token': wt_token
+          }
+
+          def download_file(direct_link, file_name, folder_path):
+              save_path = os.path.join(folder_path, file_name)
+              print(f'--> Downloading: {file_name}')
+              try:
+                  with requests.get(direct_link, headers=headers, stream=True) as r:
+                      r.raise_for_status()
+                      with open(save_path, 'wb') as f:
+                          for chunk in r.iter_content(chunk_size=8192): f.write(chunk)
+              except Exception as e:
+                  print(f'Failed {file_name}: {e}')
+
+          def process_id(current_id, rel_path=''):
+              api_url = f'https://gofile.io{current_id}'
+              try:
+                  res = requests.get(api_url, headers=headers).json()
+              except Exception as e:
+                  print(f'Connection failed: {e}')
+                  return
+              
+              if res.get('status') != 'ok': return
+              children = res.get('data', {}).get('children', {})
+              for cid, info in children.items():
+                  name = info.get('name', 'unknown')
+                  safe_name = ''.join(c for c in name if c.isalnum() or c in (' ', '_', '-')).strip()
+                  if info.get('type') == 'folder':
+                      os.makedirs(os.path.join('output', rel_path, safe_name), exist_ok=True)
+                      process_id(cid, os.path.join(rel_path, safe_name))
+                  elif info.get('type') == 'file':
+                      link = info.get('link') or info.get('directLink')
+                      if link:
+                          p_folder = os.path.join('output', rel_path)
+                          os.makedirs(p_folder, exist_ok=True)
+                          download_file(link, name, p_folder)
+
+          print('Starting folder crawl...')
+          process_id('a4eG302I')
+          print('Done!')
+          "
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
