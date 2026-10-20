@@ -1,4 +1,4 @@
-name: Gofile Downloader
+name: Gofile Downloader Fix
 
 on:
   workflow_dispatch:
@@ -7,19 +7,12 @@ jobs:
   download_file:
     runs-on: ubuntu-latest
     steps:
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-python-version: '3.10'
-
-      - name: Install Downloader
-        run: pip install gofile-dl
-
-      - name: Run Download
+      - name: Fetch and Download
         run: |
           mkdir output
           cd output
-          gofile-dl "https://gofile.io/d/a4eG302I"
+          # This tells GitHub's server to pull the file directly using an unblocked connection
+          curl -L -O "https://gofile.io/d/a4eG302I"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
